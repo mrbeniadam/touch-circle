@@ -1,0 +1,799 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f172a">
+<title>SentuhPintar — Belajar Lingkaran</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+<style>
+  :root {
+    --slate: #0f172a;
+    --indigo: #6366f1;
+    --emerald: #10b981;
+    --rose: #f43f5e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--slate);
+    color: white;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  button { touch-action: manipulation; }
+
+  .glass {
+    background: rgba(15, 23, 42, .72);
+    border: 1px solid rgba(255,255,255,.18);
+    box-shadow: 0 20px 70px rgba(0,0,0,.25);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .hidden-screen { display: none !important; }
+
+  #gameScreen {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background: linear-gradient(135deg,#172554,#0f172a);
+  }
+
+  #camera {
+    position: absolute;
+    inset: 0;
+    z-index: -3;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    background: #0f172a;
+  }
+
+  #cameraShade {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background: rgba(2,6,23,.67);
+    pointer-events: none;
+  }
+
+  .zone {
+    position: absolute;
+    inset-block: 0;
+    width: 50%;
+    border: 0;
+    z-index: -1;
+    opacity: .20;
+    transition: opacity .2s, background .2s;
+  }
+
+  .zone-left {
+    left: 0;
+    background: linear-gradient(90deg,#059669,transparent);
+    border-right: 2px solid rgba(52,211,153,.4);
+  }
+
+  .zone-right {
+    right: 0;
+    background: linear-gradient(270deg,#e11d48,transparent);
+    border-left: 2px solid rgba(251,113,133,.4);
+  }
+
+  .zone-left:hover, .zone-left:focus-visible { opacity: .40; }
+  .zone-right:hover, .zone-right:focus-visible { opacity: .40; }
+
+  #questionText {
+    text-shadow: 0 3px 8px #000, 0 0 25px rgba(0,0,0,.7);
+    overflow-wrap: anywhere;
+  }
+
+  .choice-button {
+    min-height: 72px;
+    border-radius: 18px;
+    padding: 15px 22px;
+    font-size: clamp(17px, 2vw, 23px);
+    font-weight: 900;
+    border: 2px solid rgba(255,255,255,.5);
+    transition: transform .15s, background .2s;
+  }
+
+  .choice-button:active { transform: scale(.97); }
+
+  #feedbackModal {
+    background: rgba(2,6,23,.55);
+    backdrop-filter: blur(8px);
+  }
+
+  .pop-in { animation: popIn .28s ease-out; }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: translateY(12px) scale(.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .timer-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,.18);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  #timerBar {
+    height: 100%;
+    width: 100%;
+    background: #a5b4fc;
+    border-radius: inherit;
+    transition: width .25s linear, background .2s;
+  }
+
+  .review-item {
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    border-radius: 14px;
+    padding: 15px;
+  }
+
+  @media (max-width: 640px) {
+    .choice-button { min-height: 65px; padding: 12px; }
+    #gameHeader { padding: 12px; }
+    #gameContent { padding: 12px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      transition-duration: .01ms !important;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<!-- A. SETUP SCREEN -->
+<section id="setupScreen" class="screen flex items-center justify-center p-5">
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-20 -left-20 w-80 h-80 bg-indigo-600/25 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-20 -right-20 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="glass rounded-3xl p-7 sm:p-10 w-full max-w-2xl relative pop-in">
+    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-400/15 border border-indigo-300/30 text-indigo-200 text-sm font-bold">
+      <span>◉</span> GAME PEMBELAJARAN INTERAKTIF
+    </div>
+
+    <h1 class="text-4xl sm:text-6xl font-black mt-6 leading-tight">
+      Sentuh<span class="text-indigo-300">Pintar</span>
+    </h1>
+
+    <p class="text-slate-300 mt-3 text-lg">
+      Misi Lingkaran: Benar atau Salah?
+    </p>
+
+    <div class="grid sm:grid-cols-3 gap-3 mt-7">
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div class="text-emerald-300 text-2xl">◉</div>
+        <p class="font-bold mt-2">10 Pernyataan</p>
+        <p class="text-sm text-slate-400 mt-1">Unsur dan sudut lingkaran</p>
+      </div>
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div class="text-indigo-300 text-2xl">⏱</div>
+        <p class="font-bold mt-2">20 Detik</p>
+        <p class="text-sm text-slate-400 mt-1">Untuk setiap pernyataan</p>
+      </div>
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div class="text-rose-300 text-2xl">⌖</div>
+        <p class="font-bold mt-2">Sentuh Zona</p>
+        <p class="text-sm text-slate-400 mt-1">Atau pakai panah keyboard</p>
+      </div>
+    </div>
+
+    <div class="mt-6 rounded-2xl bg-slate-950/35 border border-white/10 p-4 text-sm text-slate-300 leading-relaxed">
+      <p>🟢 <b class="text-emerald-300">KIRI = BENAR</b></p>
+      <p class="mt-1">🔴 <b class="text-rose-300">KANAN = SALAH</b></p>
+      <p class="mt-3">Kamera bersifat opsional untuk latar belakang. Jika izin kamera tidak tersedia, game tetap dapat dimainkan.</p>
+    </div>
+
+    <button id="startButton"
+      class="mt-7 w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 active:scale-[.99] transition p-4 text-lg font-black shadow-lg shadow-indigo-950/50">
+      📷 Mulai Game &amp; Buka Kamera
+    </button>
+
+    <p class="text-center text-xs text-slate-500 mt-5">
+      Matematika Umum · SMA Kelas XI · BENI ADAM, S.Pd.
+    </p>
+    <p id="setupMessage" role="status" class="text-center text-sm text-amber-300 mt-3"></p>
+  </div>
+</section>
+
+<!-- B. GAMEPLAY SCREEN -->
+<section id="gameScreen" class="screen hidden-screen">
+  <video id="camera" autoplay playsinline muted></video>
+  <div id="cameraShade"></div>
+
+  <button id="leftZone" class="zone zone-left" aria-label="Jawab Benar"></button>
+  <button id="rightZone" class="zone zone-right" aria-label="Jawab Salah"></button>
+
+  <header id="gameHeader" class="relative z-10 flex justify-between items-center gap-3 p-5">
+    <div class="glass rounded-xl px-4 py-3">
+      <div class="text-xs text-slate-300">MATERI LINGKARAN</div>
+      <div id="questionCount" class="text-xl font-black">Soal 1 / 10</div>
+    </div>
+    <div class="glass rounded-xl px-4 py-3 text-center min-w-24">
+      <div class="text-xs text-slate-300">WAKTU</div>
+      <div id="timerText" class="text-2xl font-black tabular-nums">20</div>
+    </div>
+    <button id="exitButton" class="glass rounded-xl px-4 py-3 font-bold hover:bg-white/15">
+      ✕ Keluar
+    </button>
+  </header>
+
+  <main id="gameContent" class="relative z-10 flex flex-col items-center justify-center min-h-[65vh] p-5">
+    <div class="w-full max-w-4xl">
+      <div class="flex justify-between text-xs sm:text-sm font-bold text-slate-200 mb-2">
+        <span>PROGRES BELAJAR</span>
+        <span id="progressLabel">0%</span>
+      </div>
+      <div class="timer-track mb-8">
+        <div id="timerBar"></div>
+      </div>
+
+      <div class="glass rounded-3xl p-6 sm:p-10 text-center">
+        <div class="inline-block px-4 py-2 rounded-full bg-indigo-400/20 border border-indigo-300/30 text-indigo-100 text-sm font-black">
+          PERNYATAAN
+        </div>
+
+        <h2 id="questionText" class="text-2xl sm:text-4xl lg:text-5xl font-black leading-snug mt-7 mb-9">
+          Pernyataan akan muncul di sini.
+        </h2>
+
+        <div class="grid grid-cols-2 gap-4 sm:gap-7">
+          <button id="trueButton"
+            class="choice-button bg-emerald-600/90 hover:bg-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-300/60">
+            <span class="block text-3xl mb-1">✓</span>
+            BENAR
+            <span class="block text-xs font-medium opacity-80 mt-1">Panah kiri ←</span>
+          </button>
+          <button id="falseButton"
+            class="choice-button bg-rose-600/90 hover:bg-rose-500 focus:outline-none focus:ring-4 focus:ring-rose-300/60">
+            <span class="block text-3xl mb-1">✕</span>
+            SALAH
+            <span class="block text-xs font-medium opacity-80 mt-1">Panah kanan →</span>
+          </button>
+        </div>
+
+        <p class="text-xs sm:text-sm text-slate-300 mt-6">
+          Sentuh zona kiri untuk Benar, atau zona kanan untuk Salah.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Feedback popup -->
+  <div id="feedbackModal" class="hidden-screen absolute inset-0 z-30 flex items-center justify-center p-5">
+    <div class="glass rounded-3xl p-7 sm:p-9 max-w-2xl w-full pop-in">
+      <div id="feedbackIcon" class="text-5xl mb-3">✓</div>
+      <h3 id="feedbackTitle" class="text-3xl font-black">Tepat!</h3>
+      <p id="feedbackExplanation" class="text-slate-200 text-lg leading-relaxed mt-4"></p>
+      <p class="text-sm text-indigo-200 mt-5">
+        Lanjut otomatis dalam <span id="feedbackCountdown">5</span> detik…
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- C. GAME OVER SCREEN -->
+<section id="endScreen" class="screen hidden-screen p-5 sm:p-8">
+  <div class="max-w-4xl mx-auto py-8">
+    <div class="glass rounded-3xl p-6 sm:p-10">
+      <div class="text-5xl">🎉</div>
+      <h2 class="text-4xl sm:text-5xl font-black mt-4">Hebat, Petualang Lingkaran!</h2>
+      <p class="text-slate-300 mt-3 text-lg">
+        Satu perjalanan belajar telah selesai. Yuk, baca kembali hal-hal penting yang sudah kamu pelajari.
+      </p>
+
+      <div class="mt-8 flex flex-wrap gap-3">
+        <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4">
+          <div class="text-sm text-slate-300">Pernyataan dipelajari</div>
+          <div id="reviewCount" class="text-3xl font-black text-emerald-300">10</div>
+        </div>
+        <div class="rounded-2xl bg-indigo-400/10 border border-indigo-300/20 p-4">
+          <div class="text-sm text-slate-300">Jawaban tepat</div>
+          <div id="correctCount" class="text-3xl font-black text-indigo-300">0</div>
+        </div>
+      </div>
+
+      <h3 class="text-2xl font-black mt-9 mb-4">📚 Review Materi</h3>
+      <div id="reviewList" class="space-y-3"></div>
+
+      <button id="playAgainButton"
+        class="mt-8 w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 p-4 text-lg font-black transition">
+        ↻ Main Lagi
+      </button>
+    </div>
+  </div>
+</section>
+
+<script>
+"use strict";
+
+/* ======================================================
+   BANK SOAL
+   Mata Pelajaran: Matematika Umum
+   Jenjang: SMA Kelas XI
+   Topik: Unsur lingkaran, sudut pusat dan sudut keliling
+   Jumlah: 10 pernyataan Benar/Salah
+====================================================== */
+const bankSoal = [
+  {
+    soal: "Jari-jari lingkaran adalah ruas garis yang menghubungkan pusat lingkaran dengan satu titik pada lingkaran.",
+    jawaban: "Benar",
+    penjelasan: "Jari-jari menghubungkan pusat lingkaran dengan titik pada keliling. Semua jari-jari dalam satu lingkaran memiliki panjang yang sama."
+  },
+  {
+    soal: "Diameter lingkaran adalah tali busur yang tidak harus melewati pusat lingkaran.",
+    jawaban: "Salah",
+    penjelasan: "Diameter justru merupakan tali busur yang melewati pusat lingkaran. Panjang diameter sama dengan dua kali jari-jari, yaitu d = 2r."
+  },
+  {
+    soal: "Busur lingkaran merupakan bagian dari keliling lingkaran yang menghubungkan dua titik pada lingkaran.",
+    jawaban: "Benar",
+    penjelasan: "Busur adalah bagian keliling di antara dua titik. Busur dapat berupa busur kecil atau busur besar."
+  },
+  {
+    soal: "Juring lingkaran dibatasi oleh sebuah tali busur dan sebuah busur lingkaran.",
+    jawaban: "Salah",
+    penjelasan: "Juring dibatasi oleh dua jari-jari dan satu busur. Daerah yang dibatasi oleh tali busur dan busurnya disebut tembereng."
+  },
+  {
+    soal: "Apotema terhadap suatu tali busur adalah ruas garis dari pusat lingkaran yang tegak lurus pada tali busur tersebut.",
+    jawaban: "Benar",
+    penjelasan: "Apotema merupakan jarak tegak lurus dari pusat lingkaran ke tali busur. Garis ini membagi tali busur menjadi dua bagian sama panjang."
+  },
+  {
+    soal: "Jika sudut pusat dan sudut keliling menghadap busur yang sama, maka sudut pusat besarnya dua kali sudut keliling.",
+    jawaban: "Benar",
+    penjelasan: "Untuk busur yang sama, berlaku sudut pusat = 2 × sudut keliling. Hubungan ini berlaku pada sudut-sudut yang menghadap busur yang sama."
+  },
+  {
+    soal: "Sudut keliling yang menghadap busur yang sama dengan sudut pusat 80° besarnya 80° juga.",
+    jawaban: "Salah",
+    penjelasan: "Sudut keliling besarnya setengah sudut pusat untuk busur yang sama. Jadi, sudut keliling = 80° ÷ 2 = 40°."
+  },
+  {
+    soal: "Sudut keliling yang menghadap diameter lingkaran selalu merupakan sudut siku-siku.",
+    jawaban: "Benar",
+    penjelasan: "Diameter membentuk busur setengah lingkaran dengan sudut pusat 180°. Sudut keliling yang menghadapnya adalah setengah dari 180°, yaitu 90°."
+  },
+  {
+    soal: "Dua sudut keliling yang menghadap busur yang sama selalu memiliki besar sudut yang sama.",
+    jawaban: "Benar",
+    penjelasan: "Sudut-sudut keliling yang menghadap busur sama besarnya sama. Hal ini merupakan konsekuensi dari hubungan sudut pusat dan sudut keliling."
+  },
+  {
+    soal: "Jika sudut keliling yang menghadap suatu busur adalah 32°, maka sudut pusat yang menghadap busur sama adalah 64°.",
+    jawaban: "Benar",
+    penjelasan: "Sudut pusat = 2 × sudut keliling = 2 × 32° = 64°. Perhitungan ini menggunakan hubungan sudut pusat dan sudut keliling pada busur yang sama."
+  }
+];
+
+/* Referensi elemen */
+const el = id => document.getElementById(id);
+const setupScreen = el("setupScreen");
+const gameScreen = el("gameScreen");
+const endScreen = el("endScreen");
+const camera = el("camera");
+
+let stream = null;
+let audioContext = null;
+let soundEnabled = true;
+let currentIndex = 0;
+let remainingSeconds = 20;
+let timerInterval = null;
+let feedbackInterval = null;
+let feedbackTimeout = null;
+let acceptingAnswer = false;
+let correctAnswers = 0;
+let answeredCount = 0;
+let reviewHistory = [];
+let gameSession = 0;
+
+/* ======================================================
+   AUDIO SINTETIS: tanpa MP3/WAV eksternal
+====================================================== */
+function initAudio() {
+  if (!audioContext) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) audioContext = new AudioCtx();
+  }
+  if (audioContext && audioContext.state === "suspended") {
+    audioContext.resume().catch(() => {});
+  }
+}
+
+function playTone(freq, duration, type = "sine", volume = 0.08, delay = 0) {
+  if (!soundEnabled || !audioContext) return;
+
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const startAt = audioContext.currentTime + delay;
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(freq, startAt);
+  gain.gain.setValueAtTime(volume, startAt);
+  gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
+
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start(startAt);
+  oscillator.stop(startAt + duration + 0.03);
+}
+
+function soundCorrect() {
+  playTone(523.25, 0.15, "sine", 0.08, 0);
+  playTone(659.25, 0.15, "triangle", 0.07, 0.12);
+  playTone(783.99, 0.24, "sine", 0.08, 0.24);
+}
+
+function soundWrong() {
+  playTone(260, 0.2, "sawtooth", 0.06);
+  playTone(185, 0.28, "triangle", 0.07, 0.12);
+}
+
+function soundTick() {
+  playTone(880, 0.045, "sine", 0.035);
+}
+
+function soundGameOver() {
+  playTone(523, 0.22, "triangle", 0.07, 0);
+  playTone(392, 0.24, "triangle", 0.07, 0.22);
+  playTone(330, 0.38, "sine", 0.07, 0.45);
+}
+
+function soundTimeout() {
+  playTone(330, 0.12, "sawtooth", 0.055);
+  playTone(220, 0.25, "triangle", 0.06, 0.13);
+}
+
+/* ======================================================
+   KAMERA: ideal 720p 60fps jika perangkat mendukung.
+   Game tetap berjalan jika kamera ditolak/tidak tersedia.
+====================================================== */
+async function openCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    el("setupMessage").textContent =
+      "API kamera tidak tersedia. Game akan berjalan tanpa latar kamera.";
+    return false;
+  }
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: "user",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 60 }
+      }
+    });
+
+    camera.srcObject = stream;
+    await camera.play();
+    return true;
+  } catch (error) {
+    el("setupMessage").textContent =
+      "Kamera tidak diizinkan atau tidak tersedia. Game tetap dapat dimainkan.";
+    return false;
+  }
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+  camera.srcObject = null;
+}
+
+/* ======================================================
+   NAVIGASI 3 STATE
+====================================================== */
+function showScreen(screen) {
+  setupScreen.classList.toggle("hidden-screen", screen !== "setup");
+  gameScreen.classList.toggle("hidden-screen", screen !== "game");
+  endScreen.classList.toggle("hidden-screen", screen !== "end");
+}
+
+/* ======================================================
+   TIMER DAN PROGRES
+====================================================== */
+function clearGameTimers() {
+  if (timerInterval !== null) clearInterval(timerInterval);
+  if (feedbackInterval !== null) clearInterval(feedbackInterval);
+  if (feedbackTimeout !== null) clearTimeout(feedbackTimeout);
+
+  timerInterval = null;
+  feedbackInterval = null;
+  feedbackTimeout = null;
+}
+
+function updateProgress() {
+  const percent = Math.round((currentIndex / bankSoal.length) * 100);
+  el("progressLabel").textContent = percent + "%";
+  el("questionCount").textContent =
+    `Soal ${Math.min(currentIndex + 1, bankSoal.length)} / ${bankSoal.length}`;
+}
+
+function renderTimer() {
+  el("timerText").textContent = remainingSeconds;
+  el("timerBar").style.width = (remainingSeconds / 20 * 100) + "%";
+  el("timerBar").style.background =
+    remainingSeconds <= 5 ? "#fb7185" :
+    remainingSeconds <= 10 ? "#fbbf24" : "#a5b4fc";
+}
+
+function startTimer(session) {
+  remainingSeconds = 20;
+  renderTimer();
+
+  timerInterval = setInterval(() => {
+    if (session !== gameSession || !acceptingAnswer) return;
+
+    remainingSeconds--;
+    renderTimer();
+
+    if (remainingSeconds <= 5 && remainingSeconds > 0) soundTick();
+
+    if (remainingSeconds <= 0) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      soundTimeout();
+      submitAnswer(null, session);
+    }
+  }, 1000);
+}
+
+/* ======================================================
+   GAMEPLAY
+====================================================== */
+function loadQuestion(session) {
+  if (session !== gameSession) return;
+
+  if (currentIndex >= bankSoal.length) {
+    finishGame(session);
+    return;
+  }
+
+  const item = bankSoal[currentIndex];
+  acceptingAnswer = true;
+
+  el("questionText").textContent = item.soal;
+  el("feedbackModal").classList.add("hidden-screen");
+  updateProgress();
+  startTimer(session);
+}
+
+function startGame() {
+  clearGameTimers();
+  initAudio();
+
+  gameSession++;
+  const session = gameSession;
+
+  currentIndex = 0;
+  correctAnswers = 0;
+  answeredCount = 0;
+  reviewHistory = [];
+  acceptingAnswer = false;
+
+  showScreen("game");
+  loadQuestion(session);
+}
+
+function submitAnswer(userAnswer, session = gameSession) {
+  if (session !== gameSession || !acceptingAnswer) return;
+
+  acceptingAnswer = false;
+  if (timerInterval !== null) clearInterval(timerInterval);
+  timerInterval = null;
+
+  const item = bankSoal[currentIndex];
+  const isTimeout = userAnswer === null;
+  const isCorrect = !isTimeout && userAnswer === item.jawaban;
+
+  answeredCount++;
+  if (isCorrect) correctAnswers++;
+
+  reviewHistory.push({
+    soal: item.soal,
+    jawaban: item.jawaban,
+    penjelasan: item.penjelasan,
+    pilihanPengguna: isTimeout ? "Waktu habis" : userAnswer,
+    tepat: isCorrect
+  });
+
+  if (isCorrect) {
+    soundCorrect();
+    showConfetti();
+    el("feedbackIcon").textContent = "🎉";
+    el("feedbackTitle").textContent = "Benar sekali!";
+    el("feedbackTitle").className = "text-3xl font-black text-emerald-300";
+  } else {
+    if (!isTimeout) soundWrong();
+    el("feedbackIcon").textContent = isTimeout ? "⏰" : "💡";
+    el("feedbackTitle").textContent = isTimeout ? "Waktu habis!" : "Yuk, pelajari lagi!";
+    el("feedbackTitle").className = "text-3xl font-black text-rose-300";
+  }
+
+  el("feedbackExplanation").textContent =
+    `Jawaban: ${item.jawaban}. ${item.penjelasan}`;
+
+  el("feedbackCountdown").textContent = "5";
+  el("feedbackModal").classList.remove("hidden-screen");
+
+  let seconds = 5;
+  feedbackInterval = setInterval(() => {
+    seconds--;
+    el("feedbackCountdown").textContent = seconds;
+    if (seconds <= 0) {
+      clearInterval(feedbackInterval);
+      feedbackInterval = null;
+    }
+  }, 1000);
+
+  feedbackTimeout = setTimeout(() => {
+    if (session !== gameSession) return;
+    el("feedbackModal").classList.add("hidden-screen");
+    currentIndex++;
+
+    if (currentIndex >= bankSoal.length) {
+      finishGame(session);
+    } else {
+      loadQuestion(session);
+    }
+  }, 5000);
+}
+
+/* ======================================================
+   GAME OVER + REVIEW
+====================================================== */
+function finishGame(session) {
+  if (session !== gameSession) return;
+
+  clearGameTimers();
+  acceptingAnswer = false;
+  el("feedbackModal").classList.add("hidden-screen");
+  showScreen("end");
+  stopCamera();
+
+  el("reviewCount").textContent = answeredCount;
+  el("correctCount").textContent = correctAnswers;
+
+  const list = el("reviewList");
+  list.replaceChildren();
+
+  reviewHistory.forEach((item, i) => {
+    const article = document.createElement("article");
+    article.className = "review-item";
+
+    const heading = document.createElement("h4");
+    heading.className = "font-black text-lg";
+    heading.textContent = `${i + 1}. ${item.soal}`;
+
+    const answer = document.createElement("p");
+    answer.className = "text-sm mt-2 font-bold " +
+      (item.tepat ? "text-emerald-300" : "text-amber-300");
+    answer.textContent =
+      `Jawaban yang benar: ${item.jawaban}` +
+      ` · Jawabanmu: ${item.pilihanPengguna}`;
+
+    const explanation = document.createElement("p");
+    explanation.className = "text-slate-300 leading-relaxed mt-2";
+    explanation.textContent = item.penjelasan;
+
+    article.append(heading, answer, explanation);
+    list.appendChild(article);
+  });
+
+  soundGameOver();
+  showConfetti(true);
+}
+
+/* ======================================================
+   KONFETI
+====================================================== */
+function showConfetti(isFinal = false) {
+  if (typeof confetti !== "function") return;
+
+  if (isFinal) {
+    confetti({
+      particleCount: 140,
+      spread: 100,
+      origin: { y: 0.65 },
+      colors: ["#6366f1", "#10b981", "#f43f5e", "#fbbf24"]
+    });
+    return;
+  }
+
+  confetti({
+    particleCount: 45,
+    spread: 65,
+    startVelocity: 32,
+    origin: { y: 0.62 },
+    colors: ["#10b981", "#a7f3d0", "#fbbf24"]
+  });
+}
+
+/* ======================================================
+   EVENT LISTENERS: sentuhan, mouse, keyboard
+====================================================== */
+el("startButton").addEventListener("click", async () => {
+  initAudio();
+  el("startButton").disabled = true;
+  el("startButton").textContent = "Menyiapkan kamera…";
+
+  await openCamera();
+
+  el("startButton").disabled = false;
+  el("startButton").textContent = "📷 Mulai Game & Buka Kamera";
+  startGame();
+});
+
+el("leftZone").addEventListener("click", () => submitAnswer("Benar"));
+el("rightZone").addEventListener("click", () => submitAnswer("Salah"));
+el("trueButton").addEventListener("click", () => submitAnswer("Benar"));
+el("falseButton").addEventListener("click", () => submitAnswer("Salah"));
+
+document.addEventListener("keydown", event => {
+  if (gameScreen.classList.contains("hidden-screen")) return;
+
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    submitAnswer("Benar");
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    submitAnswer("Salah");
+  } else if (event.key === "Escape") {
+    exitGame();
+  }
+});
+
+function exitGame() {
+  clearGameTimers();
+  gameSession++;
+  acceptingAnswer = false;
+  stopCamera();
+  showScreen("setup");
+  el("setupMessage").textContent = "Permainan dihentikan. Tekan Mulai untuk bermain lagi.";
+}
+
+el("exitButton").addEventListener("click", exitGame);
+
+el("playAgainButton").addEventListener("click", async () => {
+  initAudio();
+  await openCamera();
+  startGame();
+});
+
+window.addEventListener("pagehide", () => {
+  clearGameTimers();
+  stopCamera();
+});
+</script>
+</body>
+</html>
